@@ -5,14 +5,18 @@ CSC summer school RW SLT workshop
 
 Sample data and analysis scripts for online social learning task. 
 
-To replicate the analyses from the raw data, download everything in the Analysis folder and save locally. Edit the script so working directories refer to your local machine. 
+Experiment: 
+https://research.sc/participant/login/183183/publicid
+
+Log in with your assigned number (1-10)
+
+To replicate the analyses from the raw data, download everything in the Analysis folder and save locally. Edit the script so working directories refer to your local machine. Data from gorilla will be available on Tuesday here: 
 
 Run SLS_workshop.m 
 
-
 Written in Matlab R2023a but cannot guarantee that it works with other versions of MATLAB.
 
-For computational model comparison, see folder Analysis/Modelling. 
+For computational model comparison, see folder Analysis/Modelling TBC 
 
 For model comparison, run allVBA.m  TBC
 
