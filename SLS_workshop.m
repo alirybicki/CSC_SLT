@@ -13,7 +13,7 @@ datadir = ([origdir 'data/sls']);
 yourdata = ([origdir 'data/gorilla']);
 addpath(genpath(origdir));
 
-cd(datadir)
+%cd(datadir)
 cd(yourdata)
 %% ______  Rename files if using data directly from gorilla 
 % 
@@ -81,11 +81,12 @@ sess = 1;
 
 out = table();
 
+
 for subj = 1:length(subjects)
 
     for j = 1
         day = sess(j);
-        cd(datadir)
+        cd(yourdata)
 
         Filename = [char(subjects(:,subj)) '_' num2str(day) '.csv'];
 
@@ -107,9 +108,9 @@ for subj = 1:length(subjects)
         B = {'B'};
 
         if contains(group,A)
-            schedule = 1; % A
+            schedule = 1 % A
         else
-            schedule = 2; % B
+            schedule = 2 % B
         end
 
 
@@ -164,31 +165,9 @@ for subj = 1:length(subjects)
                 inexpert = 1:60;
         end
 
+
         %%
-        % Initilaise variables for simulations
-
-        % Initialise some variables
-        model_acc = [];
-        est_acc_vol =[];
-        est_acc_stable =[];
-
-        responses_sched1 = [];
-        ModPrediction_sched1 = [];
-
-        model_acc_vol = [];
-        model_acc_stable = [];
-
-        vDirect = [];
-        vIndirect = [];
-        peDirect = [];
-        peIndirect = [];
-        count = 1;
-
-
-
-        %% RESCORLA-WAGNER ANALYSIS
-        %
-        cd ([origdir '/tapas'])  %Alicia
+        cd ([origdir '/tapas'])  % volatile social 
 
         inputs_reward = data.actual_corr_choice;
         response = data.choices;
@@ -198,10 +177,11 @@ for subj = 1:length(subjects)
         condition = data.block;
 
         est = tapas_fitModel_vol_social(response, [inputs_reward inputs_groupcorrectness ], volatile, inputs_advice, condition); %
-   
+
+        
         %% To simulate the data - uncomment the next line :
 
-         sim = tapas_simModel(est.u, 'tapas_rw_social_reward_vol', [est.p_prc.p], volatile, inputs_advice, 'rw_softmax_constant_weight_social_reward', [est.p_obs.p]);
+         % sim = tapas_simModel(est.u, 'tapas_rw_social_reward_vol', [est.p_prc.p], volatile, inputs_advice, 'rw_softmax_constant_weight_social_reward', [est.p_obs.p]);
          
          % % est.y  = responses;
          % % est.u  = inputs (blue/group);
@@ -211,25 +191,16 @@ for subj = 1:length(subjects)
          % % outputs: sim.y  = simulated data 
 
 
-         %% Parameter recovery  - uncomment the next line :
-         
-         % % estimate paramters from simulated data (sim.y) 
-         est_recovered = tapas_fitModel_vol_social([sim.y], [inputs_groupcorrectness inputs_reward ], volatile, inputs_advice, group); %
-
-
         %%
-        % separate for expert and inexpert
+        % separate for expert and inexpert, two LR 
+
         volatile{1} = data.block'; % 1 if expert, 0 if inexpert
         volatile{2} = data.block';
 
-        inputs_reward = data.actual_corr_choice;
-        response = data.choices;
-        response_group2 = data.conformity;
-        inputs_advice = data.group_choice;
-        inputs_groupcorrectness = data.groupAccuracy;
-        condition = data.block;
-
         est_sls = tapas_fitModel_vol_social(response, [inputs_reward inputs_groupcorrectness ], volatile, inputs_advice, condition); %
+
+
+        
 
 
         %% save output
@@ -255,7 +226,8 @@ for subj = 1:length(subjects)
         out.conf_expert(subj,1)  = mean(data.conformity(data.block == 1));
         out.conf_inexpert(subj,1)  = mean(data.conformity(data.block == 0));
 
-        % RW Learning rate overall
+        % RW model - vol social
+
         out.indiv_LR_vol(subj,1) = est.p_prc.al_v_r;
         out.indiv_LR_stable(subj,1) = est.p_prc.al_s_r;
         out.soc_LR_vol(subj,1) = est.p_prc.al_v_a;
@@ -265,11 +237,12 @@ for subj = 1:length(subjects)
         out.v_0_a(subj,1) = est.p_prc.va_0;
         out.beta(subj,1) = est.p_obs.ze2;
         out.zeta(subj,1) = est.p_obs.ze1;
-        BIC(subj,1) = est.optim.BIC;
-        AIC(subj,1) = est.optim.AIC;
-        LME(subj,1) = est.optim.LME;
+        
+        BIC(1,subj,1) = est.optim.BIC;
+        AIC(1,subj,1) = est.optim.AIC;
+        Fvalues(1,subj,1) = est.optim.LME;
 
-        % expert/inexpert instrad of vol/stable
+        % RW model - expert/inexpert social 
 
         out.indiv_LR_expert(subj,1) = est_sls.p_prc.al_v_r;
         out.indiv_LR_inexpert(subj,1) = est_sls.p_prc.al_s_r;
@@ -280,18 +253,12 @@ for subj = 1:length(subjects)
         out.v_0_a_sls(subj,1) = est_sls.p_prc.va_0;
         out.beta_sls(subj,1) = est_sls.p_obs.ze2;
         out.zeta_sls(subj,1) = est_sls.p_obs.ze1;
-        %AIC_sls(subj,1) = est_sls.optim.AIC;
-        %LME_sls(subj,1) = est_sls.optim.LME;
+        BIC(2,subj,1) = est_sls.optim.AIC;
+        AIC(2,subj,1) = est_sls.optim.AIC;
+        Fvalues(2,subj,1) = est_sls.optim.LME;
 
+    
 
-        out.sim_LR_vol_indiv(subj,1) = est_recovered.p_prc.al_v_r;
-        out.sim_LR_stable_indiv(subj,1) = est_recovered.p_prc.al_s_r;
-        out.sim_LR_vol_soc(subj,1) = est_recovered.p_prc.al_v_a;
-        out.sim_LR_stable_soc(subj,1) = est_recovered.p_prc.al_s_a;
-        out.sim_LR_vr_0(subj,1) = est_recovered.p_prc.vr_0;
-        out.sim_LR_va_0(subj,1) = est_recovered.p_prc.va_0;
-        out.sim_ze1(subj,1) = est_recovered.p_obs.ze1;
-        out.sim_beta(subj,1) = est_recovered.p_obs.ze2;
                 
 
 
@@ -314,6 +281,7 @@ out(remove,:) = [];
 cd(origdir)
 save('data_csc','out')
 writetable(out, 'data_csc.txt')
+save('model_comparisons','BIC', 'AIC','Fvalues')
 
 %% plots
 
@@ -386,3 +354,67 @@ title('SLS')
 ylabel({'Learning rate \alpha)'})
 
 %%
+load('model_comparisons.mat')
+
+Fvalues = [Fvalues(1:2,:,:)]
+[ep,out] = VBA_groupBMC(Fvalues)
+
+
+AICgroup = [-AICvalues(1:2,:,:)]
+[h, p] = VBA_groupBMC(AIC)
+% 
+BICgroup = [-BICvalues(1:2,:,:)]
+[h, p] = VBA_groupBMC(BIC)
+
+
+%%
+
+
+% Suppl. Figures  %%% TODO 
+
+%Posterior prob
+figure
+subplot(1,2,1)    
+figs = out.VBA.cond(1).out.Ef
+figs(:,2) = out.VBA.cond(2).out.Ef
+set(gca, 'YLim', [0 1]);
+
+% flip plot so 'x' axis is vertical and 'y' is horizontal
+
+set(gca, 'Xdir', 'reverse');
+b = bar([1 2 3 4 5 6 7 8],[figs(1,1) figs(1,2); figs(2,1) figs(2,2) ;figs(3,1) figs(3,2);figs(4,1)...
+    figs(4,2); figs(5,1) figs(5,2); figs(6,1) figs(6,2); figs(7,1) figs(7,2); figs(8,1) figs(8,2)]);
+
+view([90 90]);
+ylabel('p(y|m)'); 
+xticklabels({'model 1','model 2','model 3','model 4',...
+    'model 5','model 6','model 7', 'model 8'});
+
+%legend({'PLA','HAL'})
+b(1).FaceColor = [.9 .6 .5];
+b(2).FaceColor = [.4 .6 .7];
+yticks([0 0.25 0.5])
+set(gca,'FontSize',15)
+
+%%Exceedance probability
+subplot(1,2,2)
+figs = out.VBA.cond(1).out.ep'
+figs(:,2) = out.VBA.cond(2).out.ep'
+set(gca, 'YLim', [0 1]);
+
+% flip plot so 'x' axis is vertical and 'y' is horizontal
+
+set(gca, 'Xdir', 'reverse');
+b = bar([1 2 3 4 5 6 7 8],[figs(1,1) figs(1,2); figs(2,1) figs(2,2) ;figs(3,1) figs(3,2);figs(4,1)...
+    figs(4,2); figs(5,1) figs(5,2); figs(6,1) figs(6,2); figs(7,1) figs(7,2); figs(8,1) figs(8,2)]);
+
+view([90 90]);
+ylabel('?'); 
+xticklabels({'model 1','model 2','model 3','model 4',...
+    'model 5','model 6','model 7', 'model 8'});
+
+%legend({'PLA','HAL'})
+b(1).FaceColor = [.9 .6 .5];
+b(2).FaceColor = [.4 .6 .7];
+yticks([0 1])
+set(gca,'FontSize',15)
