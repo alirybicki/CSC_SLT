@@ -14,51 +14,51 @@ yourdata = ([origdir 'data/gorilla']);
 addpath(genpath(origdir));
 
 cd(datadir)
-
+cd(yourdata)
 %% ______  Rename files if using data directly from gorilla 
-
-filePattern = fullfile(yourdata, '*.csv');
-subjects = dir(filePattern);
-for subj = 1:length(subjects) %loop through data folder
-    Filename = [subjects(subj).name];
-    if exist(Filename,"file")
-        d = readtable(Filename);
-    else
-    end
-    if height(d) > 0
-        sID = d.ParticipantPrivateID(1);
-        d.Properties.VariableNames{27} = 'randomiser';
-        rand = d.randomiser(1);
-
-        group = d.Spreadsheet(1);
-        A = {'A'};
-        B = {'B'};
-        if contains(group,A)
-            schedule = 1; % A
-        else
-            schedule = 2; % B
-        end
-        if contains(rand,A)
-            if schedule == 1
-                day = 1
-            else
-                day = 2
-            end
-        else
-            if schedule == 2
-                day = 1
-            else
-                day = 2
-
-            end
-        end
-        movefile(Filename,[num2str(sID) '_' num2str(day) '.csv']);
-
-
-
-    end
-end
-
+% 
+% filePattern = fullfile(yourdata, '*.csv');
+% subjects = dir(filePattern);
+% for subj = 1:length(subjects) %loop through data folder
+%     Filename = [subjects(subj).name];
+%     if exist(Filename,"file")
+%         d = readtable(Filename);
+%     else
+%     end
+%     if height(d) > 0
+%         sID = d.ParticipantPrivateID(1);
+%         d.Properties.VariableNames{27} = 'randomiser';
+%         rand = d.randomiser(1);
+% 
+%         group = d.Spreadsheet(1);
+%         A = {'A'};
+%         B = {'B'};
+%         if contains(group,A)
+%             schedule = 1; % A
+%         else
+%             schedule = 2; % B
+%         end
+%         if contains(rand,A)
+%             if schedule == 1
+%                 day = 1
+%             else
+%                 day = 2
+%             end
+%         else
+%             if schedule == 2
+%                 day = 1
+%             else
+%                 day = 2
+% 
+%             end
+%         end
+%         movefile(Filename,[num2str(sID) '_' num2str(day) '.csv']);
+% 
+% 
+% 
+%     end
+% end
+% 
 
 
 
@@ -164,6 +164,28 @@ for subj = 1:length(subjects)
                 inexpert = 1:60;
         end
 
+        %%
+        % Initilaise variables for simulations
+
+        % Initialise some variables
+        model_acc = [];
+        est_acc_vol =[];
+        est_acc_stable =[];
+
+        responses_sched1 = [];
+        ModPrediction_sched1 = [];
+
+        model_acc_vol = [];
+        model_acc_stable = [];
+
+        vDirect = [];
+        vIndirect = [];
+        peDirect = [];
+        peIndirect = [];
+        count = 1;
+
+
+
         %% RESCORLA-WAGNER ANALYSIS
         %
         cd ([origdir '/tapas'])  %Alicia
@@ -176,6 +198,24 @@ for subj = 1:length(subjects)
         condition = data.block;
 
         est = tapas_fitModel_vol_social(response, [inputs_reward inputs_groupcorrectness ], volatile, inputs_advice, condition); %
+   
+        %% To simulate the data - uncomment the next line :
+
+         sim = tapas_simModel(est.u, 'tapas_rw_social_reward_vol', [est.p_prc.p], volatile, inputs_advice, 'rw_softmax_constant_weight_social_reward', [est.p_obs.p]);
+         
+         % % est.y  = responses;
+         % % est.u  = inputs (blue/group);
+         % % est.p_prc.p - estimates of perceptual paramters
+         % % est.p_obs.p - estimates of observation paramters
+
+         % % outputs: sim.y  = simulated data 
+
+
+         %% Parameter recovery  - uncomment the next line :
+         
+         % % estimate paramters from simulated data (sim.y) 
+         est_recovered = tapas_fitModel_vol_social([sim.y], [inputs_groupcorrectness inputs_reward ], volatile, inputs_advice, group); %
+
 
         %%
         % separate for expert and inexpert
@@ -194,6 +234,7 @@ for subj = 1:length(subjects)
 
         %% save output
         cd(datadir)
+        out.subj(subj,1) = subj;
 
 
         out.schedule(subj,1) = schedule;
@@ -224,8 +265,9 @@ for subj = 1:length(subjects)
         out.v_0_a(subj,1) = est.p_prc.va_0;
         out.beta(subj,1) = est.p_obs.ze2;
         out.zeta(subj,1) = est.p_obs.ze1;
-        %AIC(subj,1) = est.optim.AIC;
-        %LME(subj,1) = est.optim.LME;
+        BIC(subj,1) = est.optim.BIC;
+        AIC(subj,1) = est.optim.AIC;
+        LME(subj,1) = est.optim.LME;
 
         % expert/inexpert instrad of vol/stable
 
@@ -240,6 +282,17 @@ for subj = 1:length(subjects)
         out.zeta_sls(subj,1) = est_sls.p_obs.ze1;
         %AIC_sls(subj,1) = est_sls.optim.AIC;
         %LME_sls(subj,1) = est_sls.optim.LME;
+
+
+        out.sim_LR_vol_indiv(subj,1) = est_recovered.p_prc.al_v_r;
+        out.sim_LR_stable_indiv(subj,1) = est_recovered.p_prc.al_s_r;
+        out.sim_LR_vol_soc(subj,1) = est_recovered.p_prc.al_v_a;
+        out.sim_LR_stable_soc(subj,1) = est_recovered.p_prc.al_s_a;
+        out.sim_LR_vr_0(subj,1) = est_recovered.p_prc.vr_0;
+        out.sim_LR_va_0(subj,1) = est_recovered.p_prc.va_0;
+        out.sim_ze1(subj,1) = est_recovered.p_obs.ze1;
+        out.sim_beta(subj,1) = est_recovered.p_obs.ze2;
+                
 
 
     end
@@ -259,8 +312,8 @@ end
 out(remove,:) = [];
 %sanity_figs
 cd(origdir)
-save('data_sls_adults_wide','out')
-writetable(out, 'data_sls_adults_wide.txt')
+save('data_csc','out')
+writetable(out, 'data_csc.txt')
 
 %% plots
 
@@ -303,7 +356,7 @@ figdata{2} = [out.indiv_LR_stable;out.soc_LR_stable]; % PLA]; % colour
 figcond{2} = [ones(1,height(out))';2*ones(1,height(out))']; %
 
 niceManyGroupsPlot(figdata,figcond, 'dotsize',5,'col1', 9, 'col2', 7, ...
-    'gplab', {'Expert', 'Inexpert'}, 'condlab', {'Individual', 'Social'}, ...
+    'gplab', {'volatile', 'stable'}, 'condlab', {'Individual', 'Social'}, ...
     'transp', 0.3,'whatplot', 3);
 set(gca, 'FontSize', 26);
 set(gca,'FontName', 'Arial')
