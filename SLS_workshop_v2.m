@@ -1,17 +1,36 @@
-% Calculates basic measures of accuracy, RT and learning, LR - alpha, beta
-% and WSLSbeta
+% Rename gorilla files
 
-% Alicia Rybicki - July 2022
+% Alicia Rybicki - August 2025
 
 clearvars; close all;clc
 
 
-%% specify directories
-
 origdir  = '/Users/rybickia-admin/Documents/Projects_analysis/SLT/Social_Learning_Course/SLS_analysis/';
-datadir = ([origdir 'data/gorilla']);
-addpath(genpath(origdir));
+datadir = ([origdir 'data/yourdata']);
+
 cd(datadir)
+
+%%
+filePattern = fullfile(datadir, '*.csv');
+files = dir(filePattern);
+
+% % Rename files 
+% for f = 1:length(files)
+%     oldName = files(f).name;
+% 
+%     [~, nameNoExt, ext] = fileparts(oldName);
+% 
+%     newSuffix = nameNoExt(end-1:end);
+% 
+%     newName = [newSuffix '_2' ext];
+% 
+%     movefile(fullfile(datadir, oldName), fullfile(datadir, newName));
+% 
+%     fprintf('Renamed: %s -> %s\n', oldName, newName);
+% end
+
+% Calculates basic measures of accuracy, RT and learning, LR - alpha, beta
+% and WSLSbeta
 
 
 %% data - Get subject list from data folder
@@ -33,17 +52,18 @@ end
 
 out = table();
 
-
-for subj = 1:length(subjects)
-
+for i = 1:length(subjects)
+    subj = subjects{i};  % subj is now a string like '68'
     day = 2;
     cd(datadir)
 
-    Filename = [char(subjects(:,subj)) '_' num2str(day) '.csv'];
+    Filename = [subj '_' num2str(day) '.csv'];  % <- use subj directly
 
-    if exist(Filename,"file")
+    if exist(Filename, "file")
         d = readtable(Filename);
+       
     else
+        fprintf(1, 'File %s not found\n', Filename);
     end
 
     fprintf(1, 'Now analysing %s\n', Filename);
@@ -54,7 +74,7 @@ for subj = 1:length(subjects)
     d.Properties.VariableNames{27} = 'randomiser';
     rand = d.randomiser(1);
 
-    group = d.Spreadsheet(1);
+    group = d.SpreadsheetName{1};
     A = {'A'};
     B = {'B'};
 
@@ -78,6 +98,9 @@ for subj = 1:length(subjects)
             data.choices = double(strcmp(data.Response,'yellowBox.png')); % comment for pilot
             data.actual_corr_choice = double(strcmp(data.ANSWER,'yellowBox.png')); % comment for pilot
     end
+    data.Correct = str2double(string(data.Correct)); % converts 'NaN' -> NaN
+    data.Correct(isnan(data.Correct)) = 0;
+
 
     data.accuracy = data.Correct;
     data.correct = data.Correct;
@@ -156,7 +179,8 @@ for subj = 1:length(subjects)
 
     %% save output
     cd(datadir)
-    out.subj(subj,1) = subj;
+    
+    out.subj{i,1} = subj;  
 
 
     out.schedule(subj,1) = schedule;
