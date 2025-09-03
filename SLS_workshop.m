@@ -10,8 +10,24 @@ clearvars; close all;clc
 
 origdir  = '/Users/rybickia-admin/Documents/Projects_analysis/SLT/Social_Learning_Course/SLS_analysis/';
 datadir = ([origdir 'data/gorilla']);
+%datadir = ([origdir 'data/yourdata']);
 addpath(genpath(origdir));
 cd(datadir)
+
+% % Rename files 
+% for f = 1:length(files)
+%     oldName = files(f).name;
+% 
+%     [~, nameNoExt, ext] = fileparts(oldName);
+% 
+%     newSuffix = nameNoExt(end-1:end);
+% 
+%     newName = [newSuffix '_2' ext];
+% 
+%     movefile(fullfile(datadir, oldName), fullfile(datadir, newName));
+% 
+%     fprintf('Renamed: %s -> %s\n', oldName, newName);
+% end
 
 
 %% data - Get subject list from data folder
@@ -29,9 +45,13 @@ end
 
 %% ======================== ANALYSIS LOOP ===========================
 
-
-
 out = table();
+
+% Initialize cell arrays -  parameter vectors for each subject
+all_p_prc_p = {};  % Cell array to store est.p_prc.p for each subject
+all_p_obs_p = {};  % Cell array to store est.p_obs.p for each subject
+all_p_prc_p_sls = {};  % Cell array to store est_sls.p_prc.p for each subject  
+all_p_obs_p_sls = {};  % Cell array to store est_sls.p_obs.p for each subject
 
 
 for subj = 1:length(subjects)
@@ -129,8 +149,10 @@ for subj = 1:length(subjects)
 
     est = tapas_fitModel_vol_social(response, [inputs_reward inputs_groupcorrectness ], volatile, inputs_advice, condition); %
 
+    all_p_prc_p{subj} = est.p_prc.p;
+    all_p_obs_p{subj} = est.p_obs.p;
 
-    %% To simulate the data - uncomment the next line :
+    %% To simulate the data - uncomment the next BLOCK :
 
     sim = tapas_simModel(est.u, 'tapas_rw_social_reward_vol', [est.p_prc.p], volatile, inputs_advice, 'rw_softmax_constant_weight_social_reward', [est.p_obs.p]);
 
@@ -138,10 +160,9 @@ for subj = 1:length(subjects)
     % est.u  = inputs (blue/group);
     % est.p_prc.p - estimates of perceptual paramters
     % est.p_obs.p - estimates of observation paramters
-
     % outputs: sim.y  = simulated data
 
-
+   
     %%
     % separate for expert and inexpert, two LR
 
@@ -149,11 +170,9 @@ for subj = 1:length(subjects)
     volatile{2} = data.block';
 
     est_sls = tapas_fitModel_vol_social(response, [inputs_reward inputs_groupcorrectness ], volatile, inputs_advice, condition); %
-
-
-
-
-
+    
+    all_p_prc_p_sls{subj} = est_sls.p_prc.p;
+    all_p_obs_p_sls{subj} = est_sls.p_obs.p;
     %% save output
     cd(datadir)
     out.subj(subj,1) = subj;
@@ -208,16 +227,16 @@ for subj = 1:length(subjects)
     AIC(2,subj,1) = est_sls.optim.AIC;
     Fvalues(2,subj,1) = est_sls.optim.LME;
 
-
-
-
-
+    all_choices(subj, :) = data.choices'; 
 
 end
 
-
-%%
-
+% Calculate average parameters across all subjects
+avg_p_prc_p = mean(cell2mat(all_p_prc_p'), 1);
+avg_p_obs_p = mean(cell2mat(all_p_obs_p'), 1);
+avg_p_prc_p_sls = mean(cell2mat(all_p_prc_p_sls'), 1);
+avg_p_obs_p_sls = mean(cell2mat(all_p_obs_p_sls'), 1);
+real_choices = mean(all_choices, 1);
 remove = [];
 for w = 1:height(out)
 
@@ -227,15 +246,21 @@ for w = 1:height(out)
     end
 end
 out(remove,:) = [];
+
 %sanity_figs
 cd(origdir)
 save('data_csc','out')
 writetable(out, 'data_csc.txt')
-save('gorilla_model_comparisons','BIC', 'AIC','Fvalues')
+save('model_comparisons','BIC', 'AIC','Fvalues')
 
+est.p_prc.p = avg_p_prc_p;  % Average perceptual parameters
+est.p_obs.p = avg_p_obs_p;  % Average observation parameters
+save('averaged_parameters', 'est')
+save('inputs_advice', 'inputs_advice');
+save('real_choices', 'real_choices'); 
 %% plots
 
-clearvars
+%clearvars
 close all
 
 origdir  = '/Users/rybickia-admin/Documents/Projects_analysis/SLT/Social_Learning_Course/SLS_analysis/';
@@ -304,7 +329,7 @@ title('SLS')
 ylabel({'Learning rate \alpha)'})
 
 %% 
-load('gorilla_model_comparisons.mat')
+load('model_comparisons.mat')
 
 Fvalues = [Fvalues(1:2,:,:)];
 [ep,out] = VBA_groupBMC(Fvalues);
@@ -318,7 +343,7 @@ BICgroup = -BIC(1:2,:,:);
 
 
 %%
-% Suppl. Figures  
+% Figures  
 
 % model comparison
 
@@ -328,8 +353,6 @@ subplot(1,2,1)
 figs = out.Ef;
 
 set(gca, 'YLim', [0 2]);
-
-% flip plot so 'x' axis is vertical and 'y' is horizontal
 
 set(gca, 'Xdir', 'reverse');
 b = bar([1 2 ],[figs(1); figs(2)]);
@@ -342,20 +365,203 @@ b.FaceColor = [.9 .6 .5];
 set(gca,'FontSize',15)
 yticks([0 0.25 0.5 1 1.25])
 
-%%Exceedance probability
+% Exceedance probability
 subplot(1,2,2)
 figs = out.ep';
 set(gca, 'YLim', [0 1]);
-
-% flip plot so 'x' axis is vertical and 'y' is horizontal
 
 set(gca, 'Xdir', 'reverse');
 b = bar([1 2 ],[figs(1,1); figs(2,1)]);
 
 view([90 90]);
-ylabel('EP'); 
+ylabel('ϕ'); 
 xticklabels({'model 1','model 2'});
 
 b.FaceColor = [.8 .5 .4];
 yticks([0 1])
 set(gca,'FontSize',15)
+
+
+%% Model Validation
+cd ([origdir '/tapas'])  % volatile social
+% parameter recovery
+% correlation between actual and simulated response data
+
+
+% Simulate response data using estimated model parameter values (tapas_simModel.m). 
+
+% Number of simulations
+n_sims = 500;
+
+% Pre-allocate structure to store simulation results
+sim_results = struct();
+
+
+volatile{1} = [ones(1,30) zeros(1,(60-30)) ones(1,(90-60)) zeros(1,(120-90))];
+volatile{2} = [zeros(1,30) ones(1,(60-30)) zeros(1,(90-60)) ones(1,(120-90))];
+
+load('averaged_parameters.mat')
+load('inputs_advice.mat')
+% Initialize arrays to store simulated data
+sim_results.y = cell(n_sims, 1);  % Simulated responses for each run
+sim_results.parameters.p_prc = est.p_prc.p;  % original perceptual parameters
+sim_results.parameters.p_obs = est.p_obs.p;  % original observation parameters
+sim_results.inputs.u = est.u;  % Store original inputs
+sim_results.inputs.volatile = volatile;  % Store volatility inputs
+sim_results.inputs.advice = inputs_advice;  % Store advice inputs
+
+% Run simulation loop
+fprintf('Running %d simulations...\n', n_sims);
+for i = 1:n_sims
+    if mod(i, 20) == 0  % Progress indicator every 20 simulations
+        fprintf('Completed %d/%d simulations\n', i, n_sims);
+    end
+    
+    % Run single simulation
+    sim = tapas_simModel(est.u, 'tapas_rw_social_reward_vol', ...
+                        [est.p_prc.p], volatile, inputs_advice, ...
+                        'rw_softmax_constant_weight_social_reward', ...
+                        [est.p_obs.p]);
+
+    % Store simulated responses
+    sim_results.y{i} = sim.y;
+    
+    % store other simulation outputs
+    % sim_results.other_field{i} = sim.other_field;
+end
+
+% Save results to .mat file
+cd (origdir )  % volatile social
+
+save('tapas_simulation_results.mat', 'sim_results');
+
+fprintf('Simulation completed! Results saved to tapas_simulation_results.mat\n');
+
+% summary statistics
+fprintf('\nSummary:\n');
+fprintf('Number of simulations: %d\n', n_sims);
+fprintf('Number of trials per simulation: %d\n', length(sim_results.y{1}));
+
+% Calculate mean response across all simulations
+all_responses = cell2mat(sim_results.y);  % Convert cell array to matrix
+mean_response_per_trial = mean(all_responses, 2);
+fprintf('Mean response across all simulations: %.3f\n', mean(mean_response_per_trial));
+
+
+%% 
+% STATS ON SIMUALTED DATA - Learning rates 
+
+%% Plot real vs simulated choice data over time
+cd(origdir)
+
+% Real data choices (averaged across subjects)
+load('real_choices.mat'); real_choices = real_choices;
+
+% Simulated data (averaged across n_sims)
+% Convert simulations into matrix: [n_sims x n_trials]
+all_responses = cellfun(@(x) x(:)', sim_results.y, 'UniformOutput', false);
+all_responses = vertcat(all_responses{:});   % [n_sims x 120]
+
+% average across simulations-  mean choice probability per trial
+mean_sim_choices = mean(all_responses, 1);   
+
+figure; hold on
+plot(real_choices, 'b--', 'LineWidth', 2); % Real choices
+plot(mean_sim_choices, 'k--', 'LineWidth', 2); % Simulated mean choices
+xlabel('Trial'); ylabel('Choice (0/1)');
+legend({'Real data','Simulated data'}, 'Location','best');
+title('Real vs Simulated Choices over Time');
+
+
+% fit model and (re)estimate parameters
+
+%% Re-fit model to simulated data to estimate learning rates
+n_sims = length(sim_results.y);
+recovered_params = struct();
+recovered_params.indiv_LR_vol = nan(n_sims,1);
+recovered_params.indiv_LR_stable = nan(n_sims,1);
+recovered_params.soc_LR_vol = nan(n_sims,1);
+recovered_params.soc_LR_stable = nan(n_sims,1);
+recovered_params.beta = nan(n_sims,1);
+recovered_params.zeta = nan(n_sims,1);
+
+for i = 1:n_sims
+    fprintf('Fitting model to simulation %d/%d...\n', i, n_sims);
+
+    % Simulated responses
+    sim_response = sim_results.y{i};
+
+    % Fit learning model as above.. 
+    est_sim = tapas_fitModel_vol_social(sim_response, ...
+        [inputs_reward inputs_groupcorrectness], ...
+        sim_results.inputs.volatile, ...
+        sim_results.inputs.advice, ...
+        condition);
+
+    % recovered learning rates
+    recovered_params.indiv_LR_vol(i)    = est_sim.p_prc.al_v_r;
+    recovered_params.indiv_LR_stable(i) = est_sim.p_prc.al_s_r;
+    recovered_params.soc_LR_vol(i)      = est_sim.p_prc.al_v_a;
+    recovered_params.soc_LR_stable(i)   = est_sim.p_prc.al_s_a;
+    recovered_params.beta(i) = est_sim.p_obs.ze2;
+    recovered_params.zeta(i) = est_sim.p_obs.ze1;
+end
+
+save('recovered_params.mat', 'recovered_params');
+
+%% Plot recovered learning rates
+
+figure
+clear figdata figcond
+
+figdata{1} = [recovered_params.indiv_LR_vol;recovered_params.soc_LR_vol]; % action
+figcond{1} = [ones(1,500)';2*ones(1,500)']; %
+
+figdata{2} = [recovered_params.indiv_LR_stable;recovered_params.soc_LR_stable]; % PLA]; % colour
+figcond{2} = [ones(1,500)';2*ones(1,500)']; %
+
+niceManyGroupsPlot(figdata,figcond, 'dotsize',5,'col1', 9, 'col2', 7, ...
+    'gplab', {'volatile', 'stable'}, 'condlab', {'Individual', 'Social'}, ...
+    'transp', 0.3,'whatplot', 3);
+set(gca, 'FontSize', 26);
+set(gca,'FontName', 'Arial')
+set(gca, 'YLim', [0 1]);
+title('SLS')
+ylabel({'Recovered learning rate \alpha)'})
+
+% Plot recovered beta and zeta 
+load('data_csc.mat')
+figure
+clear figdata figcond
+
+figdata{1} = [recovered_params.beta;out.beta]; % action
+n = height(out)
+figcond{1} = [ones(1,500)';2*ones(1,n)']; %
+
+niceSoloPlot(figdata,figcond, 'dotsize',5,'col1', 9, 'col2', 7, ...
+    'gplab', {''},'condlab', {'Recovered', 'Actual'}, ...
+    'transp', 0.3,'whatplot', 3);
+set(gca, 'FontSize', 26);
+set(gca,'FontName', 'Arial')
+%set(gca, 'YLim', [0 1]);
+title('Recovered vs actual \beta')
+ylabel({'\beta'})
+legend off
+
+figure
+clear figdata figcond
+
+figdata{1} = [recovered_params.zeta;out.zeta]; % action
+n = height(out)
+figcond{1} = [ones(1,500)';2*ones(1,n)']; %
+
+niceSoloPlot(figdata,figcond, 'dotsize',5,'col1', 9, 'col2', 7, ...
+    'gplab', {''},'condlab', {'Recovered', 'Actual'}, ...
+    'transp', 0.3,'whatplot', 3);
+set(gca, 'FontSize', 26);
+set(gca,'FontName', 'Arial')
+%set(gca, 'YLim', [0 1]);
+title('Recovered vs actual \zeta')
+ylabel({'\zeta'})
+legend off
+
