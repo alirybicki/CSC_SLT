@@ -10,10 +10,13 @@ clearvars; close all;clc
 
 origdir  = '/Users/rybickia-admin/Documents/Projects_analysis/SLT/Social_Learning_Course/SLS_analysis/';
 datadir = ([origdir 'data/gorilla']);
-%datadir = ([origdir 'data/yourdata']);
+datadir = ([origdir 'data/yourdata']);
 addpath(genpath(origdir));
 cd(datadir)
 
+% filePattern = fullfile(datadir, '*.csv');
+% files = dir(filePattern);
+% 
 % % Rename files 
 % for f = 1:length(files)
 %     oldName = files(f).name;
@@ -74,7 +77,7 @@ for subj = 1:length(subjects)
     d.Properties.VariableNames{27} = 'randomiser';
     rand = d.randomiser(1);
 
-    group = d.Spreadsheet(1);
+    group = d.SpreadsheetName(2);
     A = {'A'};
     B = {'B'};
 
@@ -255,7 +258,12 @@ save('model_comparisons','BIC', 'AIC','Fvalues')
 
 est.p_prc.p = avg_p_prc_p;  % Average perceptual parameters
 est.p_obs.p = avg_p_obs_p;  % Average observation parameters
+est_sls.p_prc.p = avg_p_prc_p_sls;  % Average perceptual parameters
+est_sls.p_obs.p = avg_p_obs_p_sls;  % Average observation parameters
+
 save('averaged_parameters', 'est')
+save('averaged_parameters_sls', 'est_sls')
+
 save('inputs_advice', 'inputs_advice');
 save('real_choices', 'real_choices'); 
 %% plots
@@ -446,6 +454,9 @@ fprintf('Number of trials per simulation: %d\n', length(sim_results.y{1}));
 all_responses = cell2mat(sim_results.y);  % Convert cell array to matrix
 mean_response_per_trial = mean(all_responses, 2);
 fprintf('Mean response across all simulations: %.3f\n', mean(mean_response_per_trial));
+
+%% Do simulations for expert/inexpert model 
+
 
 
 %% 
